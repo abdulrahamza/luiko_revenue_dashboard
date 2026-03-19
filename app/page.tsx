@@ -1,65 +1,84 @@
-import Image from "next/image";
+import RevenueChart from '@/components/RevenueChart';
+import OnChainTable from '@/components/OnChainTable';
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+export default async function Dashboard() {
+  const wallet = process.env.NEXT_PUBLIC_REVENUE_WALLET as string;
+  const alchemyKey = process.env.NEXT_PUBLIC_ALCHEMY_KEY as string;
+
+  let txs: { hash: string; value: number; timeStamp: number }[] = [];
+  let totalRevenue = 0;
+
+  if (wallet && alchemyKey) {
+    try {
+      const res = await fetch(`https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`, {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json',
+      },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'alchemy_getAssetTransfers',
+          params: [
+            {
+              fromBlock: '0x0',
+              toAddress: wallet,
+              excludeZeroValue: true,
+              withMetadata: true,
+              category: ['erc20'],
+              contractAddresses: ['0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'], // USDC
+              order: 'desc',
+              maxCount: '0x32',
+            },
+          ],
+        }),
+      });
+
+    const data = await res.json();
+
+    txs = (data.result?.transfers || [])
+      // remove duplicates
+      .filter((tx: any, index: number, self: any[]) => index === self.findIndex(t => t.hash === tx.hash))
+      .map((tx: any) => ({
+        hash: tx.hash,
+        value: Number(tx.value),
+        timeStamp: Math.floor(new Date(tx.metadata.blockTimestamp).getTime() / 1000),
+      }));
+
+    totalRevenue = txs.reduce((sum, tx) => sum + tx.value, 0);
+  } catch (err) {
+    console.error('Failed fetching transactions:', err);
+  }
+}
+
+return (
+  <div className="min-h-screen bg-zinc-950 text-white p-8">
+    <div className="max-w-6xl mx-auto">
+      <h1 className="text-5xl font-bold mb-6">lauki.ai Revenue Dashboard</h1>
+      <p className="text-zinc-400 mb-10">All revenue is verifiable on-chain via Base</p>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="bg-zinc-900 p-6 rounded-2xl">
+          <p className="text-gray-400">Total Revenue (USDC)</p>
+          <h2 className="text-3xl font-bold">${totalRevenue.toFixed(2)}</h2>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="bg-zinc-900 p-6 rounded-2xl">
+          <p className="text-gray-400">Transactions</p>
+          <h2 className="text-3xl font-bold">{txs.length}</h2>
         </div>
-      </main>
+        <div className="bg-zinc-900 p-6 rounded-2xl">
+          <p className="text-gray-400">Wallet</p>
+          <h2 className="text-sm break-all">{wallet}</h2>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <RevenueChart txs={txs} />
+
+      {/* Table */}
+      <OnChainTable txs={txs} />
     </div>
-  );
+  </div>
+);
 }

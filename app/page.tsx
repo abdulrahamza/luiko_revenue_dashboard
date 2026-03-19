@@ -1,5 +1,6 @@
 import RevenueChart from '@/components/RevenueChart';
 import OnChainTable from '@/components/OnChainTable';
+import SubscriptionPanel from '@/components/SubscriptionPanel';
 
 export default async function Dashboard() {
   const wallet = process.env.NEXT_PUBLIC_REVENUE_WALLET as string;
@@ -71,6 +72,11 @@ return (
           <p className="text-gray-400">Wallet</p>
           <h2 className="text-sm break-all">{wallet}</h2>
         </div>
+      </div>
+
+      {/* Subscription Management */}
+      <div className="mb-10">
+        <SubscriptionPanel />
       </div>
 
       {/* Chart */}
